@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrumScore Studio - Partituras de Batería en Tiempo Real</title>
+    <!-- Fonts -->
+    <!-- App Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text" class="loading-text">Iniciando DrumScore Studio...</div>
+    </div>
+
+    <!-- Top Navigation & Preset Selector -->
+    <header class="top-navbar">
+        <div class="brand-group">
+            <div class="brand-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="m4.93 4.93 4.24 4.24"></path>
+                    <path d="m14.83 14.83 4.24 4.24"></path>
+                    <path d="m14.83 9.17 4.24-4.24"></path>
+                    <path d="m4.93 19.07 4.24-4.24"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            </div>
+            <div class="brand-text">
+                <h1>DrumScore Studio</h1>
+                <span>Reproductor & Sintetizador de Partituras</span>
+            </div>
+        </div>
+
+        <div class="preset-group">
+            <label for="preset-select" style="font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; font-weight: 600;">Partitura:</label>
+            <select id="preset-select" class="select-preset">
+                <!-- Injected via presets.js -->
+            </select>
+        </div>
+
+        <div class="top-actions">
+            <label class="btn-upload-file btn-upload-image" title="Subir una imagen de una partitura de batería (JPG, PNG, WEBP)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <span>Subir Imagen</span>
+                <input type="file" id="image-input" accept=".png,.jpg,.jpeg,.webp,.bmp" style="display: none;">
+            </label>
+
+            <label class="btn-upload-file" title="Cargar archivo MusicXML (.musicxml, .xml, .mxl) o Guitar Pro (.gp)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <span>Cargar Partitura</span>
+                <input type="file" id="file-input" accept=".musicxml,.xml,.mxl,.gp,.gp3,.gp4,.gp5,.gpx" style="display: none;">
+            </label>
+
+            <button id="btn-export-wav" class="btn-export" title="Exportar la partitura a archivo de audio WAV estéreo">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Exportar WAV</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Preset Description Banner -->
+    <div class="preset-banner">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <span id="preset-description">Cargando información del ritmo...</span>
+    </div>
+
+    <div id="app-error" class="app-error" role="alert" hidden></div>
+    <section class="library-bar" aria-label="Partituras guardadas">
+        <label>Mis partituras <select id="saved-score-select"><option value="">Mis partituras…</option></select></label>
+        <label>Nombre <input id="save-title" type="text" maxlength="160" placeholder="Nombre de la partitura"></label>
+        <label>Pista <select id="track-select" disabled></select></label>
+        <div class="library-actions">
+            <button id="btn-save-score" class="btn-transport" disabled>Guardar</button>
+            <button id="btn-edit-score" class="btn-transport" disabled>Editar notas</button>
+            <button id="btn-download-score" class="btn-transport" disabled>Descargar partitura</button>
+        </div>
+        <span id="library-status" role="status" aria-live="polite"></span>
+    </section>
+
+    <!-- Main Workspace -->
+    <main class="studio-layout">
+
+        <!-- DAW Transport Control Panel -->
+        <section class="transport-panel">
+            <!-- Row 1: Playback Buttons, Tempo & Audio Controls -->
+            <div class="transport-main-row">
+                <!-- Playback controls -->
+                <div class="transport-playback-group">
+                    <button id="btn-rewind" class="btn-transport" title="Ir al inicio (Compás 1)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="11 19 2 12 11 5 11 19"></polygon>
+                            <polygon points="22 19 13 12 22 5 22 19"></polygon>
+                        </svg>
+                    </button>
+
+                    <button id="btn-prev-measure" class="btn-transport" title="Retroceder 1 compás">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="6" y1="4" x2="6" y2="20"></line>
+                            <polygon points="18 19 8 12 18 5 18 19"></polygon>
+                        </svg>
+                    </button>
+
+                    <button id="btn-play-pause" class="btn-transport btn-play-pause" title="Reproducir / Pausar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span>Reproducir</span>
+                    </button>
+
+                    <button id="btn-stop" class="btn-transport" title="Detener">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                        </svg>
+                    </button>
+
+                    <button id="btn-next-measure" class="btn-transport" title="Adelantar 1 compás">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="6 5 16 12 6 19 6 5"></polygon>
+                            <line x1="18" y1="4" x2="18" y2="20"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Live Tempo / BPM Adjustment -->
+                <div class="transport-tempo-group">
+                    <div class="tempo-info">
+                        <span class="tempo-label">Velocidad</span>
+                        <span id="bpm-value" class="tempo-bpm-val">120 BPM</span>
+                    </div>
+
+                    <div class="tempo-slider-wrap">
+                        <button id="btn-bpm-minus" class="btn-tempo-step" title="Disminuir 5 BPM">-</button>
+                        <input type="range" id="bpm-slider" class="bpm-slider" min="30" max="280" value="120" title="Acelerar o ralentizar el tempo de la partitura">
+                        <button id="btn-bpm-plus" class="btn-tempo-step" title="Aumentar 5 BPM">+</button>
+                    </div>
+
+                    <button id="btn-tap-tempo" class="btn-tap-tempo" title="Haz clic repetidas veces para marcar el tempo deseado">TAP</button>
+
+                    <!-- Speed Multiplier Presets -->
+                    <div class="speed-pills">
+                        <button class="speed-pill" data-speed="0.5">0.5x</button>
+                        <button class="speed-pill" data-speed="0.75">0.75x</button>
+                        <button class="speed-pill active" data-speed="1.0">1.0x</button>
+                        <button class="speed-pill" data-speed="1.25">1.25x</button>
+                        <button class="speed-pill" data-speed="1.5">1.5x</button>
+                        <button class="speed-pill" data-speed="2.0">2.0x</button>
+                    </div>
+                </div>
+
+                <!-- Loop & Metronome & Volume -->
+                <div class="transport-audio-group">
+                    <!-- Loop Section -->
+                    <div class="transport-loop-group">
+                        <button id="btn-loop-a" class="btn-loop" title="Fijar el inicio del compás actual como punto A">Punto A</button>
+                        <button id="btn-loop-b" class="btn-loop" title="Fijar el final del compás actual como punto B">Punto B</button>
+                        <button aria-pressed="false" id="btn-loop-toggle" class="btn-loop" title="Activar / Desactivar bucle continuo">Bucle</button>
+                    </div>
+
+                    <!-- Metronome Toggle -->
+                    <div class="control-toggle-wrap">
+                        <span>Claqueta:</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="metronome-toggle">
+                            <span class="slider-switch"></span>
+                        </label>
+                        <input type="range" id="metronome-volume" class="slider-mini" min="0" max="1" step="0.05" value="0.8" title="Volumen del metrónomo">
+                    </div>
+
+                    <!-- Master Volume -->
+                    <div class="control-toggle-wrap">
+                        <span>Volumen:</span>
+                        <input type="range" id="master-volume" class="slider-mini" min="0" max="1" step="0.05" value="1.0" title="Volumen maestro">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Interactive Timeline Scrubber & Position Display -->
+            <div class="transport-timeline-row">
+                <div class="timeline-scrubber-wrap">
+                    <div class="timeline-track-bg">
+                        <div id="timeline-progress" class="timeline-progress-bar"></div>
+                    </div>
+                    <input type="range" aria-label="Posición de reproducción" id="timeline-scrubber" class="timeline-range-input" min="0" max="100" value="0" step="0.1">
+                </div>
+
+                <div id="time-display" class="timeline-time-info">0:00 / 0:00</div>
+                <div id="measure-display" class="measure-info-badge">Compás: 1 | Tiempo: 1</div>
+                <div id="loop-status" class="loop-status-text">Sin bucle</div>
+            </div>
+        </section>
+
+        <!-- Virtual Drum Kit Visualizer Stage -->
+        <section id="drum-kit-visualizer-target">
+            <!-- Injected via drumKitVisualizer.js -->
+        </section>
+
+        <!-- Interactive Sheet Music Notation Container -->
+        <section class="score-section">
+            <div class="score-container" id="alphaTab">
+                <!-- alphaTab renders SVG drum sheet music score here -->
+            </div>
+        </section>
+
+        <!-- Drag and Drop Drop-Zone -->
+        <section id="drop-zone" class="drop-zone">
+            <p>Puedes arrastrar y soltar cualquier partitura en formato <strong>.musicxml</strong>, <strong>.xml</strong>, <strong>.mxl</strong> o <strong>.gp</strong> directamente en esta ventana para abrirla y reproducirla instantáneamente.</p>
+        </section>
+
+    </main>
+
+    <!-- Audio Export Modal -->
+    <div id="export-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Exportar audio">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Exportar Sonido de la Partitura (WAV)</h3>
+                <button id="btn-close-export" class="btn-close-modal" aria-label="Cerrar exportación">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                    El motor sintetizará la partitura a velocidad máxima utilizando las muestras de la biblioteca de batería y generará un archivo de audio WAV estéreo (16-bit PCM / 44.1 kHz) sin pérdida de calidad.
+                </p>
+
+                <div class="export-options-list">
+                    <label class="export-option-item">
+                        <input type="checkbox" id="export-include-metronome">
+                        <span>Incluir claqueta / metrónomo en el audio de salida</span>
+                    </label>
+                    <label class="export-option-item">
+                        <input type="checkbox" id="export-loop-only">
+                        <span>Exportar únicamente el fragmento en bucle A-B seleccionado</span>
+                    </label>
+                </div>
+
+                <div class="export-progress-wrap">
+                    <div class="export-progress-bar-bg">
+                        <div id="export-progress" class="export-progress-bar-fill"></div>
+                    </div>
+                    <div id="export-status" class="export-status-text">Listo para exportar</div>
+                </div>
+
+                <div id="export-result" class="export-result-box" style="display: none;">
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-green);">¡Audio generado con éxito!</div>
+                    <audio id="export-audio-preview" class="audio-preview-player" controls></audio>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-export" class="btn-transport" hidden>Cancelar exportación</button>
+                <button id="btn-start-export" class="btn-export">Comenzar Exportación</button>
+                <button id="btn-download-export" class="btn-export" style="background: linear-gradient(135deg, #10b981, #059669); display: none;">Descargar WAV</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Scanner OMR Modal -->
+    <div id="image-scanner-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Leer y corregir una partitura">
+        <div class="modal-card image-scanner-card">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <h3>Lector Óptico de Partituras de Batería (OMR)</h3>
+                </div>
+                <button id="btn-close-scanner" class="btn-close-modal" aria-label="Cerrar lector">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.82rem; color: var(--text-secondary);">
+                    Elegí el tempo, el compás y la subdivisión de la imagen. Después revisá los golpes en la cuadrícula: las fotos y las distintas formas de escribir batería pueden necesitar correcciones.
+                </p>
+
+                <div class="scan-settings">
+                    <label>Título <input id="scan-title" maxlength="160" value="Partitura de batería"></label>
+                    <label>Tempo (negra por minuto) <input id="scan-bpm" type="number" min="30" max="280" value="120"></label>
+                    <label>Compás <select id="scan-meter">
+                        <option>2/4</option><option>3/4</option><option selected>4/4</option><option>5/4</option>
+                        <option>6/8</option><option>9/8</option><option>12/8</option>
+                    </select></label>
+                    <label>Subdivisión <select id="scan-subdivision">
+                        <option value="8">Corcheas</option><option value="16">Semicorcheas</option>
+                        <option value="32">Fusas</option><option value="12">Tresillos de corchea</option>
+                        <option value="24">Tresillos de semicorchea</option>
+                    </select></label>
+                    <button id="btn-reanalyze" class="btn-sample-img" disabled>Analizar de nuevo</button>
+                </div>
+                <!-- Quick Samples Buttons -->
+                <div class="sample-images-bar">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">O prueba con una imagen de ejemplo:</span>
+                    <button id="btn-sample-rock" class="btn-sample-img">Ritmo Rock 4/4</button>
+                    <button id="btn-sample-fill" class="btn-sample-img">Fill de Toms</button>
+                </div>
+
+                <!-- Scanner Status & Radar -->
+                <div id="scanner-status-box" class="scanner-status-box">
+                    <div class="scanner-spinner"></div>
+                    <span role="status" aria-live="polite" id="scanner-status-text">Analizando imagen...</span>
+                </div>
+
+                <!-- Image Comparison View -->
+                <div class="image-preview-container">
+                    <div class="image-preview-column">
+                        <span class="preview-label">Imagen Analizada (Detección de Notas)</span>
+                        <div class="img-wrap">
+                            <img id="scanner-annotated-img" src="" alt="Partitura Analizada">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detection Statistics Badges -->
+                <div id="scanner-stats-row" class="scanner-stats-row" style="display: none;">
+                    <div class="stat-pill" style="border-color: #10b981;"><span class="dot" style="background: #10b981;"></span><span id="stat-kick">0 Bombos</span></div>
+                    <div class="stat-pill" style="border-color: #ef4444;"><span class="dot" style="background: #ef4444;"></span><span id="stat-snare">0 Cajas</span></div>
+                    <div class="stat-pill" style="border-color: #eab308;"><span class="dot" style="background: #eab308;"></span><span id="stat-hihat">0 Charles</span></div>
+                    <div class="stat-pill" style="border-color: #8b5cf6;"><span class="dot" style="background: #8b5cf6;"></span><span id="stat-toms">0 Toms</span></div>
+                    <div class="stat-pill" style="border-color: #f59e0b;"><span class="dot" style="background: #f59e0b;"></span><span id="stat-cymbals">0 Platos</span></div>
+                </div>
+
+                <!-- Interactive Drum Matrix Sequencer / Note Editor -->
+                <div id="drum-grid-editor-wrap" class="drum-grid-editor-wrap" style="display: none;">
+                    <div class="drum-grid-header">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">Editor Interactivo de Notas Detectadas</span>
+                        </div>
+                        <span style="font-size: 0.72rem; color: var(--text-muted);">Haz clic en cualquier casilla para añadir o quitar golpes</span>
+                    </div>
+                    <div class="matrix-navigation">
+                        <label>Editar <select id="matrix-measure"></select></label>
+                        <button id="btn-copy-measure" class="btn-sample-img" disabled>Copiar compás anterior</button>
+                    </div>
+                    <div id="drum-matrix-container" class="drum-matrix-container">
+                        <!-- Populated by app.js -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-scan" class="btn-transport">Cancelar</button>
+                <button id="btn-load-scanned-score" class="btn-export" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 700;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>Cargar y guardar partitura</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        DrumScore Studio &copy; 2026 &bull; Motor de síntesis y notación para bateristas &bull; MusicXML y Guitar Pro · Versión 1.1.0
+    </footer>
+
+    <!-- Scripts -->
+    <script src="assets/alphatab/alphaTab.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
