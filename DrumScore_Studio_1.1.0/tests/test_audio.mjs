@@ -67,6 +67,32 @@ for(const [meter,subdivision,beats] of [['6/8',8,3],['12/8',16,6],['3/4',12,3],[
     const imported=a.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(run.stdout));
     const {midi}=createScoreMidi(a,imported,new a.Settings());
     check(imported.masterBars[0].calculateDuration()===960*beats,`${meter} duration`);
-    assert.deepEqual(allNotes(midi).map(e=>e.noteKey),[36]); assertions++;
+        assert.deepEqual(allNotes(midi).map(e=>e.noteKey),[36]); assertions++;
 }
+// Test new instruments: China (52), Ride Bell (53), Splash (55) in compilation, alphaTab import and audio rendering
+const newInstScript=`from score_grid import compile_grid
+g=[{'measure':1,'slots':[{'instruments':['kick','china']},{'instruments':['ride_bell']},{'instruments':['splash']}] + [{'instruments':[]} for _ in range(5)]}]
+print(compile_grid(g,{'meter':'4/4','subdivision':8,'bpm':120})['musicXml'])`;
+const newInstRun=spawnSync(process.env.PYTHON || 'python',['-c',newInstScript],{cwd:root});
+assert.equal(newInstRun.status,0,newInstRun.stderr.toString());
+const newInstXml=newInstRun.stdout.toString();
+check(newInstXml.includes('<midi-unpitched>53</midi-unpitched>'),'China midi-unpitched 53');
+check(newInstXml.includes('<midi-unpitched>54</midi-unpitched>'),'Ride Bell midi-unpitched 54');
+check(newInstXml.includes('<midi-unpitched>56</midi-unpitched>'),'Splash midi-unpitched 56');
+
+const importedNew=a.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(newInstRun.stdout));
+const {midi:newMidi,transpositions:newTrans}=createScoreMidi(a,importedNew,new a.Settings());
+const newNotes=allNotes(newMidi);
+check(newNotes.length===4,'4 notes imported including chord');
+assert.deepEqual(newNotes.map(n=>n.noteKey).sort((x,y)=>x-y),[36,52,53,55]); assertions++;
+
+const newRenderer=createOfflineRenderer(a,newMidi,font,{playbackRange:{startTick:0,endTick:3840}},newTrans);
+let newPeak=0;
+while(true){
+    const chunk=newRenderer.render(200); if(!chunk) break;
+    for(const s of chunk.samples) newPeak=Math.max(newPeak,Math.abs(s));
+}
+newRenderer.destroy();
+check(newPeak>0.05,'audible synthesized sound for China, Splash and Ride Bell');
+
 console.log(JSON.stringify({result:'PASS',presets:9,wavSeconds:{normal:normal.seconds,halfTempo:slow.seconds,doubleTempo:fast.seconds,selectedBar:later.seconds},peak:normal.peak,assertions},null,2));

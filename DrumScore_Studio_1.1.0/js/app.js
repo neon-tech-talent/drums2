@@ -4,11 +4,21 @@ import { AudioExporter } from './audioExporter.js';
 import { createScoreMidi } from './offlineAudio.js';
 
 const DRUMS = [
-    ['crash','Crash',49,'crash'], ['ride','Ride',51,'crash'],
-    ['hihat','Charles cerrado',42,'hihat'], ['hihat_open','Charles abierto',46,'hihat'],
-    ['hihat_pedal','Charles de pedal',44,'hihat'], ['tom_high','Tom alto',50,'tom'],
-    ['tom_mid','Tom medio',47,'tom'], ['snare','Caja',38,'snare'],
-    ['sidestick','Aro',37,'snare'], ['tom_low','Tom base',43,'tom'], ['kick','Bombo',36,'kick']
+    ['china','China',52,'cymbals'],
+    ['splash','Splash',55,'cymbals'],
+    ['crash','Crash',49,'crash'],
+    ['ride_bell','Campana de Ride',53,'cymbals'],
+    ['ride','Ride',51,'crash'],
+    ['hihat','Charles cerrado',42,'hihat'],
+    ['hihat_open','Charles abierto',46,'hihat'],
+    ['hihat_pedal','Charles de pedal',44,'hihat'],
+    ['tom_high','Tom alto',50,'tom'],
+    ['tom_mid','Tom medio',47,'tom'],
+    ['snare','Caja',38,'snare'],
+    ['sidestick','Aro',37,'snare'],
+    ['tom_low','Tom base',43,'tom'],
+    ['tom_floor2','Tom base 2',41,'tom'],
+    ['kick','Bombo',36,'kick']
 ];
 const $ = id => document.getElementById(id);
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -482,7 +492,7 @@ export class DrumScoreStudio {
     updateStats() {
         const counts={kick:0,snare:0,hihat:0,toms:0,cymbals:0};
         for(const m of this.scannedGrid) for(const s of m.slots) for(const id of s.instruments) {
-            const category=id.startsWith('tom')?'toms':id.startsWith('hihat')?'hihat':id==='sidestick'?'snare':['crash','ride'].includes(id)?'cymbals':id;
+            const category=id.startsWith('tom')?'toms':id.startsWith('hihat')?'hihat':id==='sidestick'?'snare':['crash','ride','china','splash','ride_bell'].includes(id)?'cymbals':id;
             counts[category]++;
         }
         for(const [key,label] of [['kick','Bombos'],['snare','Cajas'],['hihat','Charles'],['toms','Toms'],['cymbals','Platos']]) $(`stat-${key}`).textContent=`${counts[key]} ${label}`;

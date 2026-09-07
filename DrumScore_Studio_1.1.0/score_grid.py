@@ -2,16 +2,20 @@
 from xml.etree import ElementTree as ET
 
 DRUMS = {
+    'china': ('China Cymbal', 52, 'C', 6, 'x'),
+    'splash': ('Splash Cymbal', 55, 'B', 5, 'x'),
     'crash': ('Crash Cymbal', 49, 'A', 5, 'x'),
-    'ride': ('Ride Cymbal', 51, 'F', 5, 'x'),
+    'hihat_open': ('Open Hi-Hat', 46, 'G', 5, 'circle-x'),
     'hihat': ('Closed Hi-Hat', 42, 'G', 5, 'x'),
-    'hihat_open': ('Open Hi-Hat', 46, 'G', 5, 'x'),
+    'ride_bell': ('Ride Bell', 53, 'F', 5, 'diamond'),
+    'ride': ('Ride Cymbal', 51, 'F', 5, 'x'),
     'hihat_pedal': ('Pedal Hi-Hat', 44, 'D', 4, 'x'),
     'tom_high': ('High Tom', 50, 'E', 5, None),
     'tom_mid': ('Mid Tom', 47, 'D', 5, None),
     'snare': ('Snare Drum', 38, 'C', 5, None),
     'sidestick': ('Side Stick', 37, 'C', 5, 'x'),
     'tom_low': ('Low Tom', 43, 'A', 4, None),
+    'tom_floor2': ('Floor Tom 2', 41, 'F', 4, None),
     'kick': ('Bass Drum', 36, 'F', 4, None),
 }
 
@@ -91,7 +95,7 @@ def compile_grid(grid, config=None):
                     unpitched = ET.SubElement(note, 'unpitched')
                     ET.SubElement(unpitched, 'display-step').text = step
                     ET.SubElement(unpitched, 'display-octave').text = str(octave)
-                    category = 'Toms' if key.startswith('tom_') else ('Closed Hi-Hat' if key.startswith('hihat') else ('Crash Cymbal' if key in ('crash', 'ride') else ('Snare Drum' if key == 'sidestick' else name)))
+                    category = 'Toms' if key.startswith('tom_') else ('Closed Hi-Hat' if key.startswith('hihat') else ('Crash Cymbal' if key in ('crash', 'ride', 'china', 'splash', 'ride_bell') else ('Snare Drum' if key == 'sidestick' else name)))
                     stats[category] = stats.get(category, 0) + 1
                 else: ET.SubElement(note, 'rest')
                 ET.SubElement(note, 'duration').text = str(duration)

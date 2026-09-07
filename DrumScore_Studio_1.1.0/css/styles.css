@@ -667,6 +667,32 @@ input:checked + .slider-switch:before {
     background: radial-gradient(circle, #fef08a 0%, #b45309 65%, #451a03 100%);
 }
 
+.china-cymbal .cymbal-disc {
+    width: 96px;
+    height: 96px;
+    background: radial-gradient(circle, #fde047 0%, #b45309 50%, #78350f 85%, #d97706 100%);
+    border: 2px dashed #f59e0b;
+}
+
+.splash-cymbal .cymbal-disc {
+    width: 68px;
+    height: 68px;
+    background: radial-gradient(circle, #fef08a 0%, #eab308 60%, #a16207 100%);
+    border: 2px solid #facc15;
+}
+
+.ride-bell-pad .cymbal-disc {
+    width: 68px;
+    height: 68px;
+    background: radial-gradient(circle, #38bdf8 0%, #0284c7 60%, #0369a1 100%);
+    border: 2px solid #38bdf8;
+}
+
+.ride-bell-pad .ride-bell-highlight {
+    background: radial-gradient(circle, #e0f2fe 0%, #38bdf8 100%);
+    box-shadow: 0 0 8px #38bdf8;
+}
+
 /* Drums Visuals (Snare, Kick, Toms) */
 .drum-head {
     width: 78px;
@@ -1234,7 +1260,8 @@ input:checked + .slider-switch:before {
     box-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
 }
 
-.matrix-cell-btn.active.crash {
+.matrix-cell-btn.active.crash,
+.matrix-cell-btn.active.cymbals {
     background-color: #f59e0b;
     border-color: #f59e0b;
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
@@ -1244,6 +1271,53 @@ input:checked + .slider-switch:before {
     background-color: #8b5cf6;
     border-color: #8b5cf6;
     box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+}
+
+/* Notation Reference Legend Card */
+.notation-legend {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+.notation-legend-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.notation-legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.4rem 0.8rem;
+    font-size: 0.76rem;
+}
+
+.notation-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text-secondary);
+}
+
+.notation-symbol-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    font-weight: 800;
+    font-size: 0.75rem;
+    color: var(--accent-cyan);
 }
 
 

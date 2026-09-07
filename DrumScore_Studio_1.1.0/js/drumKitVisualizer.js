@@ -16,7 +16,9 @@ export class DrumKitVisualizer {
             'f': 'tom-floor',
             'c': 'crash',
             'r': 'ride',
-            'e': 'ride-bell'
+            'e': 'ride-bell',
+            'y': 'china',
+            'w': 'splash'
         };
 
         this.initAudio();
@@ -52,18 +54,32 @@ export class DrumKitVisualizer {
                         <span>Batería Virtual en Tiempo Real</span>
                     </div>
                     <div class="drum-kit-help">
-                        <span>Haz clic en cualquier pieza o usa el teclado (B, S, H, O, T, G, F, C, R). Espacio: reproducir o pausar</span>
+                        <span>Haz clic en cualquier pieza o usa el teclado (B, S, X, H, O, P, T, G, F, C, R, Y, W, E). Espacio: reproducir o pausar</span>
                     </div>
                 </div>
 
                 <div class="drum-stage" id="drum-stage">
                     <!-- Cymbals Top Row -->
                     <div class="drum-row cymbals-row">
+                        <div class="drum-pad cymbal china-cymbal" data-drum="china" title="China Cymbal [Y]">
+                            <div class="cymbal-disc china-disc">
+                                <div class="cymbal-bell"></div>
+                            </div>
+                            <span class="pad-label">China [Y]</span>
+                        </div>
+
                         <div class="drum-pad cymbal crash-cymbal" data-drum="crash" title="Crash Cymbal [C]">
                             <div class="cymbal-disc">
                                 <div class="cymbal-bell"></div>
                             </div>
                             <span class="pad-label">Crash [C]</span>
+                        </div>
+
+                        <div class="drum-pad cymbal splash-cymbal" data-drum="splash" title="Splash Cymbal [W]">
+                            <div class="cymbal-disc splash-disc">
+                                <div class="cymbal-bell"></div>
+                            </div>
+                            <span class="pad-label">Splash [W]</span>
                         </div>
 
                         <div class="drum-pad cymbal hihat-pad" data-drum="hihat-closed" title="Hi-Hat Cerrado [H] / Abierto [O]">
@@ -76,11 +92,18 @@ export class DrumKitVisualizer {
                             </div>
                         </div>
 
-                        <div class="drum-pad cymbal ride-cymbal" data-drum="ride" title="Ride Cymbal [R] / Bell [E]">
+                        <div class="drum-pad cymbal ride-cymbal" data-drum="ride" title="Ride Cymbal [R]">
                             <div class="cymbal-disc">
-                                <div class="cymbal-bell ride-bell-highlight" data-sub="bell"></div>
+                                <div class="cymbal-bell"></div>
                             </div>
                             <span class="pad-label">Ride [R]</span>
+                        </div>
+
+                        <div class="drum-pad cymbal ride-bell-pad" data-drum="ride-bell" title="Campana de Ride [E]">
+                            <div class="cymbal-disc ride-bell-disc">
+                                <div class="cymbal-bell ride-bell-highlight"></div>
+                            </div>
+                            <span class="pad-label">Campana [E]</span>
                         </div>
                     </div>
 
@@ -205,16 +228,20 @@ export class DrumKitVisualizer {
                 break;
             case 49: // Crash Cymbal 1
             case 57: // Crash Cymbal 2
-            case 55: // Splash
-            case 52: // Chinese
                 drumId = 'crash';
+                break;
+            case 55: // Splash
+                drumId = 'splash';
+                break;
+            case 52: // Chinese
+                drumId = 'china';
                 break;
             case 51: // Ride Cymbal 1
             case 59: // Ride Cymbal 2
                 drumId = 'ride';
                 break;
             case 53: // Ride Bell
-                drumId = 'ride';
+                drumId = 'ride-bell';
                 break;
             default:
                 // Fallback by name inspection
@@ -228,8 +255,11 @@ export class DrumKitVisualizer {
                     else if (name.includes('low') || name.includes('floor')) drumId = 'tom-floor';
                     else drumId = 'tom-mid';
                 }
+                else if (name.includes('ride') && name.includes('bell')) drumId = 'ride-bell';
                 else if (name.includes('ride')) drumId = 'ride';
-                else if (name.includes('crash') || name.includes('splash') || name.includes('china')) drumId = 'crash';
+                else if (name.includes('china') || name.includes('chinese')) drumId = 'china';
+                else if (name.includes('splash')) drumId = 'splash';
+                else if (name.includes('crash')) drumId = 'crash';
                 break;
         }
 
@@ -244,7 +274,7 @@ export class DrumKitVisualizer {
     hit(drumId, playSound = false) {
         let element = this.drumElements.get(drumId);
         if (drumId === 'sidestick') element = this.drumElements.get('snare');
-        if (drumId === 'ride-bell') element = this.drumElements.get('ride');
+        if (drumId === 'ride-bell' && !element) element = this.drumElements.get('ride');
         if (drumId === 'hihat-pedal') element = this.drumElements.get('hihat-closed');
         if (!element && drumId === 'hihat-open') {
             element = this.drumElements.get('hihat-closed');
@@ -344,7 +374,24 @@ export class DrumKitVisualizer {
             this.playCymbalNoise(ctx, now, 6000, 0.45, 0.7);
         } else if (drumId === 'crash') {
             this.playCymbalNoise(ctx, now, 4500, 1.4, 0.85);
-        } else if (drumId === 'ride' || drumId === 'ride-bell') {
+        } else if (drumId === 'china') {
+            this.playCymbalNoise(ctx, now, 3200, 1.3, 0.9);
+        } else if (drumId === 'splash') {
+            this.playCymbalNoise(ctx, now, 9200, 0.35, 0.7);
+        } else if (drumId === 'ride-bell') {
+            const osc = ctx.createOscillator();
+            const osc2 = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(820, now);
+            osc2.type = 'triangle'; osc2.frequency.setValueAtTime(1640, now);
+            gain.gain.setValueAtTime(0.7, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+            osc.connect(gain); osc2.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now); osc.stop(now + 0.61);
+            osc2.start(now); osc2.stop(now + 0.61);
+            this.playCymbalNoise(ctx, now, 7500, 0.4, 0.35);
+        } else if (drumId === 'ride') {
             this.playCymbalNoise(ctx, now, 8500, 0.8, 0.5);
         } else if (drumId.startsWith('tom')) {
             const freq = drumId === 'tom-high' ? 180 : drumId === 'tom-mid' ? 130 : 90;

@@ -137,4 +137,64 @@ class DrumStudioTests(unittest.TestCase):
                 self.assertEqual(base64.b64decode(loaded['data']).decode(),compiled['musicXml'])
 
 
+    def test_new_instruments_grid_xml_midi_and_noteheads(self):
+        grid = [{'measure': 1, 'slots': [
+            {'instruments': ['kick', 'china', 'splash', 'ride_bell']}, # Chord with new instruments
+            {'instruments': ['ride']},
+            {'instruments': ['snare', 'hihat_open']},
+            {'instruments': ['sidestick']},
+            {'instruments': ['tom_high']},
+            {'instruments': ['tom_mid']},
+            {'instruments': ['tom_low']},
+            {'instruments': ['tom_floor2']}
+        ]}]
+        result = compile_grid(grid, {'meter': '4/4', 'subdivision': 8, 'bpm': 100})
+        self.assertTrue(result['success'])
+        root = ET.fromstring(result['musicXml'])
+
+        # Verify midi-unpitched values: MIDI + 1
+        self.assertEqual(root.findtext('.//midi-instrument[@id="P1-I52"]/midi-unpitched'), '53') # China (52 -> 53)
+        self.assertEqual(root.findtext('.//midi-instrument[@id="P1-I53"]/midi-unpitched'), '54') # Ride Bell (53 -> 54)
+        self.assertEqual(root.findtext('.//midi-instrument[@id="P1-I55"]/midi-unpitched'), '56') # Splash (55 -> 56)
+        self.assertEqual(root.findtext('.//midi-instrument[@id="P1-I46"]/midi-unpitched'), '47') # Open Hi-Hat (46 -> 47)
+        self.assertEqual(root.findtext('.//midi-instrument[@id="P1-I36"]/midi-unpitched'), '37') # Kick (36 -> 37)
+
+        # Verify noteheads in the generated notes
+        notes = root.findall('.//note')
+        # In slot 0: kick (None), china (x), splash (x), ride_bell (diamond)
+        chord_notes = [n for n in notes if n.find('chord') is not None]
+        self.assertGreaterEqual(len(chord_notes), 3) # Chords maintain all their notes
+
+        heads = {n.find('instrument').attrib['id']: (n.findtext('notehead') or 'normal')
+                 for n in notes if n.find('instrument') is not None}
+        self.assertEqual(heads['P1-I53'], 'diamond')
+        self.assertEqual(heads['P1-I46'], 'circle-x')
+        self.assertEqual(heads['P1-I52'], 'x')
+        self.assertEqual(heads['P1-I55'], 'x')
+        self.assertEqual(heads['P1-I51'], 'x')
+        self.assertEqual(heads['P1-I37'], 'x')
+        self.assertEqual(heads['P1-I36'], 'normal')
+        self.assertEqual(heads['P1-I38'], 'normal')
+        self.assertEqual(heads['P1-I50'], 'normal')
+
+    def test_omr_new_instruments_and_discrimination(self):
+        omr = DrumOMR()
+        st = {'lines': [100, 116, 132, 148, 164], 'spacing': 16.0}
+        self.assertEqual(omr._classify({'y': 100 - 2.5*16, 'shape': 'x'}, st), 'china')
+        self.assertEqual(omr._classify({'y': 100 - 1.7*16, 'shape': 'x'}, st), 'splash')
+        self.assertEqual(omr._classify({'y': 100 - 1.0*16, 'shape': 'x'}, st), 'crash')
+        self.assertEqual(omr._classify({'y': 100 - 0.5*16, 'shape': 'x'}, st), 'hihat')
+        # Differentiate Ride normal from Ride Bell
+        self.assertEqual(omr._classify({'y': 100, 'shape': 'x'}, st), 'ride')
+        self.assertEqual(omr._classify({'y': 100, 'shape': 'diamond'}, st), 'ride_bell')
+        # Differentiate 4 toms
+        self.assertEqual(omr._classify({'y': 100 + 0.5*16, 'shape': 'normal'}, st), 'tom_high')
+        self.assertEqual(omr._classify({'y': 100 + 1.0*16, 'shape': 'normal'}, st), 'tom_mid')
+        self.assertEqual(omr._classify({'y': 100 + 2.5*16, 'shape': 'normal'}, st), 'tom_low')
+        self.assertEqual(omr._classify({'y': 100 + 3.0*16, 'shape': 'normal'}, st), 'tom_floor2')
+        # Snare and Sidestick
+        self.assertEqual(omr._classify({'y': 100 + 1.5*16, 'shape': 'normal'}, st), 'snare')
+        self.assertEqual(omr._classify({'y': 100 + 1.5*16, 'shape': 'x'}, st), 'sidestick')
+
+
 if __name__ == '__main__': unittest.main(verbosity=2)

@@ -13,11 +13,30 @@ from scipy import ndimage
 from score_grid import compile_grid, validate_config, DRUMS
 
 
+DEFAULT_CALIBRATION = [
+    {'id': 'china',       'target': -2.5, 'tolerance': 0.65, 'head': 'x',       'name': 'China Cymbal'},
+    {'id': 'splash',      'target': -1.7, 'tolerance': 0.38, 'head': 'x',       'name': 'Splash Cymbal'},
+    {'id': 'crash',       'target': -1.0, 'tolerance': 0.35, 'head': 'x',       'name': 'Crash Cymbal'},
+    {'id': 'hihat',       'target': -0.5, 'tolerance': 0.28, 'head': 'x',       'name': 'Closed Hi-Hat'},
+    {'id': 'ride_bell',   'target':  0.0, 'tolerance': 0.28, 'head': 'diamond', 'name': 'Ride Bell'},
+    {'id': 'ride',        'target':  0.0, 'tolerance': 0.28, 'head': 'x',       'name': 'Ride Cymbal'},
+    {'id': 'tom_high',    'target':  0.5, 'tolerance': 0.28, 'head': 'normal',  'name': 'High Tom'},
+    {'id': 'tom_mid',     'target':  1.0, 'tolerance': 0.28, 'head': 'normal',  'name': 'Mid Tom'},
+    {'id': 'snare',       'target':  1.5, 'tolerance': 0.28, 'head': 'normal',  'name': 'Snare Drum'},
+    {'id': 'sidestick',   'target':  1.5, 'tolerance': 0.28, 'head': 'x',       'name': 'Side Stick'},
+    {'id': 'tom_low',     'target':  2.5, 'tolerance': 0.40, 'head': 'normal',  'name': 'Low Tom'},
+    {'id': 'tom_floor2',  'target':  3.0, 'tolerance': 0.30, 'head': 'normal',  'name': 'Floor Tom 2'},
+    {'id': 'kick',        'target':  3.5, 'tolerance': 0.45, 'head': 'normal',  'name': 'Bass Drum'},
+    {'id': 'hihat_pedal', 'target':  4.5, 'tolerance': 0.45, 'head': 'x',       'name': 'Pedal Hi-Hat'},
+]
+
+
 class DrumOMR:
     def process_image(self, image_bytes, bpm=None, config=None):
         config = dict(config or {})
         if bpm is not None: config['bpm'] = bpm
         c = validate_config(config)
+        calibration = config.get('calibration', DEFAULT_CALIBRATION)
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter('error', Image.DecompressionBombWarning)
@@ -44,15 +63,20 @@ class DrumOMR:
         measures = self._detect_all_measures(binary, staves)
         if not measures: raise ValueError('No se pudieron separar los compases. Probá recortar un solo renglón.')
         if len(measures) > 256: raise ValueError('Dividí la imagen en páginas de hasta 256 compases.')
-        grid, notes, review = self._scan_measures(binary, staves, measures, c['slotsPerMeasure'])
+        grid, notes, review = self._scan_measures(binary, staves, measures, c['slotsPerMeasure'], calibration)
         if not notes:
             raise ValueError('Se encontró el pentagrama, pero no se distinguieron notas. Probá una imagen más clara.')
         result = compile_grid(grid, c)
         draw = ImageDraw.Draw(img)
         for m in measures:
-            top, bottom = m['lines'][0] - m['spacing'] * 2, m['lines'][-1] + m['spacing']
+            top, bottom = m['lines'][0] - m['spacing'] * 3, m['lines'][-1] + m['spacing'] * 1.5
             draw.rectangle((m['x_left'], max(0, top), m['x_right'], min(img.height-1, bottom)), outline='#0284c7', width=1)
-        colors = {'kick':'#059669','snare':'#dc2626','hihat':'#ca8a04','crash':'#ea580c'}
+        colors = {
+            'kick': '#059669', 'snare': '#dc2626', 'sidestick': '#f43f5e',
+            'hihat': '#ca8a04', 'hihat_open': '#eab308', 'hihat_pedal': '#a16207',
+            'tom_high': '#9333ea', 'tom_mid': '#7c3aed', 'tom_low': '#6366f1', 'tom_floor2': '#4f46e5',
+            'ride': '#0284c7', 'ride_bell': '#06b6d4', 'crash': '#ea580c', 'splash': '#f97316', 'china': '#d97706',
+        }
         for note in notes:
             x, y = note['x'], note['y']
             draw.ellipse((x-6,y-6,x+6,y+6), outline=colors.get(note['id'], '#9333ea'), width=2)
@@ -149,8 +173,8 @@ class DrumOMR:
 
     def _noteheads(self, binary, st):
         spacing = st['spacing']
-        y0 = max(0, int(st['lines'][0] - 2*spacing))
-        y1 = min(binary.shape[0], int(st['lines'][-1] + spacing))
+        y0 = max(0, int(st['lines'][0] - 3.5*spacing))
+        y1 = min(binary.shape[0], int(st['lines'][-1] + 2.0*spacing))
         crop = binary[y0:y1].astype(bool)
         horizontal = ndimage.binary_opening(ndimage.binary_dilation(crop, structure=np.ones((3,1), bool)), structure=np.ones((1, max(10,int(spacing*3))), bool))
         vertical = ndimage.binary_opening(ndimage.binary_dilation(crop, structure=np.ones((1,3), bool)), structure=np.ones((max(10,int(spacing*1.2)),1), bool))
@@ -164,26 +188,69 @@ class DrumOMR:
             width, height = xs.stop-xs.start, ys.stop-ys.start
             mask = labels[slices] == number
             area = int(mask.sum())
-            if not (spacing*0.28 <= width <= spacing*1.25 and spacing*0.23 <= height <= spacing*1.1): continue
-            if area < max(7, spacing*spacing*0.075): continue
+            if not (spacing*0.25 <= width <= spacing*1.5 and spacing*0.20 <= height <= spacing*1.4): continue
+            if area < max(6, spacing*spacing*0.06): continue
             cy, cx = ndimage.center_of_mass(mask)
-            heads.append({'x':xs.start+float(cx), 'y':y0+ys.start+float(cy), 'area':area})
+            fill_ratio = area / max(1, width * height)
+
+            # Analyze shape (cross/x, diamond, normal)
+            cw = max(1, min(width, height) // 4)
+            tl = mask[:cw, :cw].sum()
+            tr = mask[:cw, -cw:].sum()
+            bl = mask[-cw:, :cw].sum()
+            br = mask[-cw:, -cw:].sum()
+            corner_ratio = (tl + tr + bl + br) / max(1, 4 * cw * cw)
+
+            cy_m, cx_m = height // 2, width // 2
+            mid_w = max(1, min(width, height) // 4)
+            center_mask = mask[max(0, cy_m-mid_w):min(height, cy_m+mid_w+1),
+                               max(0, cx_m-mid_w):min(width, cx_m+mid_w+1)]
+            center_ratio = center_mask.sum() / max(1, center_mask.size)
+
+            if fill_ratio < 0.52 and corner_ratio > 0.12:
+                shape = 'x'
+            elif corner_ratio < 0.15 and (0.35 <= fill_ratio <= 0.65 or center_ratio > 0.65):
+                shape = 'diamond'
+            else:
+                shape = 'normal'
+
+            heads.append({
+                'x': xs.start + float(cx),
+                'y': y0 + ys.start + float(cy),
+                'area': area,
+                'width': width,
+                'height': height,
+                'shape': shape,
+                'fill_ratio': fill_ratio
+            })
         return heads
 
-    def _classify(self, y, st):
-        pos = (y - st['lines'][0])/st['spacing']
-        # Common drum notation; other conventions require correction in the editor.
-        bands = [(-1.5,'crash'),(-0.5,'hihat'),(0,'ride'),(0.5,'tom_high'),
-                 (1,'tom_mid'),(1.5,'snare'),(2.5,'tom_low'),(3,'tom_low'),(3.5,'kick'),(4,'kick'),(4.5,'hihat_pedal')]
-        target, instrument = min(bands, key=lambda b: abs(b[0]-pos))
-        return instrument if abs(target-pos) <= 0.24 else None
+    def _classify(self, target, st, calibration=None):
+        table = calibration or DEFAULT_CALIBRATION
+        y = target['y'] if isinstance(target, dict) else float(target)
+        shape = target.get('shape', 'any') if isinstance(target, dict) else 'any'
+        pos = (y - st['lines'][0]) / st['spacing']
+        matches = []
+        for entry in table:
+            dist = abs(entry['target'] - pos)
+            if dist <= entry['tolerance']:
+                score = dist
+                if shape != 'any' and entry['head'] != 'any':
+                    if entry['head'] == shape: score -= 0.10
+                    else: score += 0.30
+                matches.append((score, entry['id']))
+        if not matches: return None
+        matches.sort(key=lambda m: m[0])
+        best_score, best_id = matches[0]
+        if best_score > 0.52: return None
+        return best_id
 
-    def _scan_measures(self, binary, staves, measures, slots):
+    def _scan_measures(self, binary, staves, measures, slots, calibration=None):
         by_system = [self._noteheads(binary, st) for st in staves]
         grid, notes, review = [], [], []
         for m in measures:
             heads = [h for h in by_system[m['system_index']] if m['x_left']+m['spacing']*0.5 < h['x'] < m['x_right']-m['spacing']*0.5]
-            heads = [{**h,'id':self._classify(h['y'],m)} for h in heads]
+            heads = [{**h, 'id': self._classify(h, m, calibration)} for h in heads]
             heads = [h for h in heads if h['id']]
             groups = []
             for head in sorted(heads, key=lambda h:h['x']):
