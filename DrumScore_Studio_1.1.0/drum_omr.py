@@ -68,13 +68,13 @@ class DrumOMR:
         return result
 
     def _otsu_threshold(self, arr):
-        hist = np.bincount(arr.ravel(), minlength=256)
-        total = arr.size
+        hist = np.bincount(arr.ravel(), minlength=256).astype(np.float64)
+        total = float(arr.size)
         left_count = np.cumsum(hist)
         right_count = total - left_count
-        left_sum = np.cumsum(hist * np.arange(256))
+        left_sum = np.cumsum(hist * np.arange(256, dtype=np.float64))
         valid = (left_count > 0) & (right_count > 0)
-        variance = np.zeros(256)
+        variance = np.zeros(256, dtype=np.float64)
         variance[valid] = (left_sum[-1] * left_count[valid] - left_sum[valid] * total) ** 2 / (left_count[valid] * right_count[valid])
         return min(210, max(85, int(np.argmax(variance)) + 8))
 
@@ -98,7 +98,13 @@ class DrumOMR:
 
     def _detect_all_staves(self, binary):
         h, w = binary.shape
-        rows = np.flatnonzero(binary.sum(axis=1) >= w * 0.3)
+        k_len = max(12, int(w * 0.06))
+        opened = ndimage.binary_opening(binary, structure=np.ones((1, k_len)))
+        row_sums = opened.sum(axis=1)
+        thresh = max(w * 0.25, 20)
+        rows = np.flatnonzero(row_sums >= thresh)
+        if len(rows) < 5:
+            rows = np.flatnonzero(row_sums >= max(w * 0.15, 15))
         clusters = []
         for y in rows:
             if not clusters or y - clusters[-1][-1] > 2: clusters.append([y])
@@ -108,8 +114,9 @@ class DrumOMR:
         i = 0
         while i <= len(centers) - 5:
             lines = centers[i:i+5]
-            spacing = float(np.mean(np.diff(lines)))
-            if 4 <= spacing <= 60 and np.std(np.diff(lines)) <= max(0.8, spacing*0.12):
+            diffs = np.diff(lines)
+            spacing = float(np.mean(diffs))
+            if 4 <= spacing <= 60 and np.std(diffs) <= max(0.85, spacing*0.14):
                 staves.append({'lines': lines, 'spacing': spacing})
                 i += 5
             else: i += 1
